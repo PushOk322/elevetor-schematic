@@ -1,45 +1,91 @@
 import './style.css'
 import * as PIXI from 'pixi.js'
-import * as TWEEN from '@tweenjs/tween.js'
+import { Group } from '@tweenjs/tween.js'
+import { config } from './config'
+import { createElevator } from './elevator'
+import { startPersonSpawner } from './personSpawner'
+import { createFloorQueues, addPersonToQueue, type PersonView } from './floorQueues'
 
-// Create PIXI application
 const app = new PIXI.Application()
 
-// Initialize the application
 await app.init({
-  width: 800,
-  height: 600,
+  width: config.canvasWidth,
+  height: config.canvasHeight,
   backgroundColor: 0xffffff,
 })
 
-// Add PIXI canvas to DOM
 const appElement = document.querySelector<HTMLDivElement>('#app')!
 appElement.innerHTML = ''
 appElement.appendChild(app.canvas)
 
-// Create elevator cabin rectangle
-const cabin = new PIXI.Graphics()
-cabin.rect(0, 0, 100, 150)
-cabin.fill(0x333333)
-cabin.x = 350
-cabin.y = 225
+// Convert floor index (0 = ground) to Y coordinate
+const floorToY = (floor: number) =>
+  app.renderer.height - config.bottomMargin - (floor - 1) * config.floorHeight
 
-// Add cabin to stage
-app.stage.addChild(cabin)
-
-// RAF loop for TWEEN updates and PIXI rendering
-let lastTime = performance.now()
-
-function animate(time: number) {
-  const delta = time - lastTime
-  lastTime = time
-  
-  // Update TWEEN with elapsed time
-  TWEEN.update(time)
-  
-  // PIXI will render automatically on next frame
-  requestAnimationFrame(animate)
+// Draw floor lines and labels
+const floorsGraphics = new PIXI.Graphics()
+for (let floor = 1; floor <= config.floorsCount; floor += 1) {
+  const y = floorToY(floor)
+  floorsGraphics.moveTo(config.shaftX, y)
+  floorsGraphics.lineTo(config.rightX, y)
 }
 
-// Start animation loop
-requestAnimationFrame(animate)
+for (let floor = 1; floor <= config.floorsCount; floor += 1) {
+  const y = floorToY(floor)
+  const label = new PIXI.Text({
+    text: `level ${floor}`,
+    style: { fill: 0x111111, fontSize: 16 },
+  })
+  label.anchor.set(0, 0.5)
+  label.position.set(config.rightX + 10, y)
+  app.stage.addChild(label)
+}
+
+// Setup tween group
+const tweenGroup = new Group()
+app.ticker.add(() => {
+  tweenGroup.update()
+})
+
+// Create floor queues
+const floorQueues = createFloorQueues()
+
+// Create elevator
+const { elevator, moveToFloor, boardPassengers, dropPassengers } = createElevator(
+  app,
+  tweenGroup,
+  floorToY
+)
+
+// Start person spawner - add to queue when they reach waiting spot
+startPersonSpawner(app, tweenGroup, floorToY, (personView: PersonView) => {
+  addPersonToQueue(floorQueues, personView.person.spawnFloor, personView)
+})
+
+// Demo elevator route
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const runDemoRoute = async () => {
+  let headingUp = true
+
+  while (true) {
+    const topFloor = config.floorsCount - 1
+    const nextFloor = headingUp ? topFloor : 1
+
+    await moveToFloor(nextFloor)
+
+    // Drop passengers at their target floor
+    dropPassengers()
+
+    // Board passengers going in the same direction
+    const direction = headingUp ? 'up' : 'down'
+    boardPassengers(floorQueues, direction)
+
+    await wait(800) // stop delay
+    elevator.state = 'idle'
+
+    headingUp = !headingUp
+  }
+}
+
+void runDemoRoute()
