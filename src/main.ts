@@ -1,24 +1,45 @@
 import './style.css'
-import typescriptLogo from './typescript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'
+import * as PIXI from 'pixi.js'
+import * as TWEEN from '@tweenjs/tween.js'
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`
+// Create PIXI application
+const app = new PIXI.Application()
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+// Initialize the application
+await app.init({
+  width: 800,
+  height: 600,
+  backgroundColor: 0xffffff,
+})
+
+// Add PIXI canvas to DOM
+const appElement = document.querySelector<HTMLDivElement>('#app')!
+appElement.innerHTML = ''
+appElement.appendChild(app.canvas)
+
+// Create elevator cabin rectangle
+const cabin = new PIXI.Graphics()
+cabin.rect(0, 0, 100, 150)
+cabin.fill(0x333333)
+cabin.x = 350
+cabin.y = 225
+
+// Add cabin to stage
+app.stage.addChild(cabin)
+
+// RAF loop for TWEEN updates and PIXI rendering
+let lastTime = performance.now()
+
+function animate(time: number) {
+  const delta = time - lastTime
+  lastTime = time
+  
+  // Update TWEEN with elapsed time
+  TWEEN.update(time)
+  
+  // PIXI will render automatically on next frame
+  requestAnimationFrame(animate)
+}
+
+// Start animation loop
+requestAnimationFrame(animate)
