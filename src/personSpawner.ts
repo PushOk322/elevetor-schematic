@@ -3,10 +3,10 @@ import { Group } from '@tweenjs/tween.js'
 import { config } from './config'
 import { createPerson } from './person'
 import { createPersonView } from './personView'
-import type { PersonView } from './floorQueues'
+import { type PersonView } from './floorQueues'
 
-const MIN_SPAWN_INTERVAL = 4000 // 4 seconds
-const MAX_SPAWN_INTERVAL = 10000 // 10 seconds
+const MIN_SPAWN_INTERVAL = 5000 // 5 seconds
+const MAX_SPAWN_INTERVAL = 15000 // 15 seconds
 
 function randomSpawnDelay(): number {
   return MIN_SPAWN_INTERVAL + Math.random() * (MAX_SPAWN_INTERVAL - MIN_SPAWN_INTERVAL)
@@ -24,14 +24,20 @@ export function startPersonSpawner(
       const person = createPerson(floor)
       const view = createPersonView(app, tweenGroup, person, floorToY, () => {
         // When person reaches waiting spot, add to queue
+
+        console.log('[PERSON REACHED WAITING SPOT floor]', floor)
         onPersonReachWaitingSpot({ person, view })
+        // relayoutFloorQueues(queues, floor)
       })
       scheduleSpawn(floor) // Schedule next spawn for this floor
     }, delay)
   }
 
   // Start spawn timers for each floor
-  for (let floor = 1; floor <= config.floorsCount; floor += 1) {
+  for (let floor = 0; floor < config.floorsCount; floor += 1) {
+    console.log('[SPAWN LOOP floor]', floor)
     scheduleSpawn(floor)
   }
+  
+  
 }

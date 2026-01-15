@@ -24,13 +24,13 @@ const floorToY = (floor: number) =>
 
 // Draw floor lines and labels
 const floorsGraphics = new PIXI.Graphics()
-for (let floor = 1; floor <= config.floorsCount; floor += 1) {
+for (let floor = 0; floor < config.floorsCount; floor += 1) {
   const y = floorToY(floor)
   floorsGraphics.moveTo(config.shaftX, y)
   floorsGraphics.lineTo(config.rightX, y)
 }
 
-for (let floor = 1; floor <= config.floorsCount; floor += 1) {
+for (let floor = 0; floor < config.floorsCount; floor += 1) {
   const y = floorToY(floor)
   const label = new PIXI.Text({
     text: `level ${floor}`,
@@ -66,26 +66,42 @@ startPersonSpawner(app, tweenGroup, floorToY, (personView: PersonView) => {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const runDemoRoute = async () => {
-  let headingUp = true
+    let headingUp = true
 
-  while (true) {
-    const topFloor = config.floorsCount - 1
-    const nextFloor = headingUp ? topFloor : 1
+    while (true) {
+      const current = elevator.currentFloor
+      let nextFloor: number
 
-    await moveToFloor(nextFloor)
+      if (headingUp) {
+        nextFloor = current + 1
+        if (nextFloor >= config.floorsCount) {
+          headingUp = false
+          nextFloor = current - 1
+        }
+      } else {
+        nextFloor = current - 1
+        if (nextFloor < 0) {
+          headingUp = true
+          nextFloor = current + 1
+        }
+      }
 
-    // Drop passengers at their target floor
-    dropPassengers()
+      await moveToFloor(nextFloor)
 
-    // Board passengers going in the same direction
-    const direction = headingUp ? 'up' : 'down'
-    boardPassengers(floorQueues, direction)
+      // 1. Drop off
+      dropPassengers()
 
-    await wait(800) // stop delay
-    elevator.state = 'idle'
+      // 2. Board
+      // On top floor must go down, on bottom must go up
+      const effectiveDir = elevator.currentFloor === config.floorsCount - 1 
+        ? 'down' 
+        : (elevator.currentFloor === 0 ? 'up' : (headingUp ? 'up' : 'down'))
+      
+      boardPassengers(floorQueues, effectiveDir)
 
-    headingUp = !headingUp
+      await wait(1000)
+      elevator.state = 'idle'
+    }
   }
-}
 
-void runDemoRoute()
+  void runDemoRoute()
