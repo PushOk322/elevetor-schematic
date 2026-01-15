@@ -26,12 +26,14 @@ export function createElevator(
   const passengers: PersonView[] = []
 
   const cabin = new PIXI.Graphics()
-  cabin.rect(0, 0, 100, 150)
-  cabin.fill(0x333333)
+  // Match cabin height to floorHeight for perfect alignment
+  cabin.rect(0, 0, 100, config.floorHeight)
+  cabin.stroke({ width: 4, color: 0x333333 })
   cabin.x = config.shaftX - cabin.width
   app.stage.addChild(cabin)
 
   const placeAtFloor = (floor: number) => {
+    // Cabin y is the top, so we subtract height from floor Y
     cabin.y = floorToY(floor) - cabin.height
   }
 
@@ -48,22 +50,22 @@ export function createElevator(
     return new Promise<void>((resolve) => {
       const startY = cabin.y
       const endY = floorToY(clamped) - cabin.height
-      const duration = distance * 1000
+      const duration = distance * 400 
 
-      tweenGroup.add(
-        new Tween({ y: startY })
-          .to({ y: endY }, duration)
-          .easing(Easing.Quadratic.InOut)
-          .onUpdate(({ y }) => {
-            cabin.y = y
-          })
-          .onComplete(() => {
-            elevator.currentFloor = clamped
-            elevator.state = 'loading'
-            resolve()
-          })
-          .start()
-      )
+      const tween = new Tween({ y: startY })
+        .to({ y: endY }, duration)
+        .easing(Easing.Quadratic.InOut)
+        .onUpdate(({ y }) => {
+          cabin.y = y
+        })
+        .onComplete(() => {
+          elevator.currentFloor = clamped
+          elevator.state = 'idle' // Reset to idle immediately
+          resolve()
+        })
+        .start()
+
+      tweenGroup.add(tween)
     })
   }
 
@@ -78,13 +80,19 @@ export function createElevator(
         const personView = queue.shift()!
         passengers.push(personView)
         
-        // Change parent to cabin so they move together
         cabin.addChild(personView.view)
         
-        // Spread them out inside the cabin (relative coordinates)
-        const spacing = cabin.width / (config.elevatorCapacity + 1)
-        personView.view.x = spacing * passengers.length - personView.view.width / 2
-        personView.view.y = cabin.height - personView.view.height - 5 // Floor of cabin
+        // Reset position relative to cabin
+        personView.view.x = 0
+        personView.view.y = 0
+        
+        // Calculate a nice grid-like position inside the cabin border
+        const index = passengers.length - 1;
+        const row = Math.floor(index / 2);
+        const col = index % 2;
+        
+        personView.view.x = 15 + col * 40; // Horizontal offset
+        personView.view.y = cabin.height - personView.view.height - 10 - (row * 10); 
       }
 
       relayoutFloorQueues(queues, elevator.currentFloor)

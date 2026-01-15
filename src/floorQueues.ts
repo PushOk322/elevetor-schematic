@@ -63,10 +63,11 @@ export function addPersonToQueue(
 
   if (personView.person.dir === 'up') floorQueue.upQueue.push(personView)
   else floorQueue.downQueue.push(personView)
-}
 
+      relayoutFloorQueues(queues, floor)
+    }
 
-export function relayoutFloorQueues(queues: FloorQueues[], floor: number) {
+    export function relayoutFloorQueues(queues: FloorQueues[], floor: number) {
   const fq = queues[floor]
   layoutQueue(fq.upQueue)
   layoutQueue(fq.downQueue)

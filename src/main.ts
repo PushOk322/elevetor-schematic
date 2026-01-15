@@ -19,16 +19,20 @@ appElement.innerHTML = ''
 appElement.appendChild(app.canvas)
 
 // Convert floor index (0 = ground) to Y coordinate
+// Fixed: removed (floor - 1) which caused misalignment
 const floorToY = (floor: number) =>
-  app.renderer.height - config.bottomMargin - (floor - 1) * config.floorHeight
+  app.renderer.height - config.bottomMargin - floor * config.floorHeight
 
 // Draw floor lines and labels
 const floorsGraphics = new PIXI.Graphics()
 for (let floor = 0; floor < config.floorsCount; floor += 1) {
   const y = floorToY(floor)
-  floorsGraphics.moveTo(config.shaftX, y)
+  // Use stroke to actually draw the lines
+  floorsGraphics.moveTo(config.shaftX - 100, y)
   floorsGraphics.lineTo(config.rightX, y)
+  floorsGraphics.stroke({ width: 1, color: 0xcccccc })
 }
+app.stage.addChild(floorsGraphics) // CRITICAL: Add to stage
 
 for (let floor = 0; floor < config.floorsCount; floor += 1) {
   const y = floorToY(floor)
@@ -51,7 +55,7 @@ app.ticker.add(() => {
 const floorQueues = createFloorQueues()
 
 // Create elevator
-const { elevator, moveToFloor, boardPassengers, dropPassengers } = createElevator(
+const { elevator, passengers, moveToFloor, boardPassengers, dropPassengers } = createElevator(
   app,
   tweenGroup,
   floorToY
@@ -60,48 +64,82 @@ const { elevator, moveToFloor, boardPassengers, dropPassengers } = createElevato
 // Start person spawner - add to queue when they reach waiting spot
 startPersonSpawner(app, tweenGroup, floorToY, (personView: PersonView) => {
   addPersonToQueue(floorQueues, personView.person.spawnFloor, personView)
-})
+}, floorQueues) // Pass floorQueues
 
 // Demo elevator route
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const runDemoRoute = async () => {
-    let headingUp = true
+const runSmartElevator = async () => {
+  let currentDir: 'up' | 'down' = 'up'
 
-    while (true) {
-      const current = elevator.currentFloor
-      let nextFloor: number
+  while (true) {
+    const currentFloor = elevator.currentFloor;
 
-      if (headingUp) {
-        nextFloor = current + 1
-        if (nextFloor >= config.floorsCount) {
-          headingUp = false
-          nextFloor = current - 1
-        }
-      } else {
-        nextFloor = current - 1
-        if (nextFloor < 0) {
-          headingUp = true
-          nextFloor = current + 1
-        }
+    // 1. Service the current floor (Drop off & Board)
+    const dropped = dropPassengers();
+    boardPassengers(floorQueues, currentDir);
+
+    if (dropped.length > 0 || passengers.length > 0) {
+      await wait(1000); // "Doors open" delay
+    }
+
+    // 2. Find the next target floor
+    let targetFloor = -1;
+
+    // Priority 1: If we have passengers, where do they want to go?
+    // If moving Up, find the lowest target floor above us.
+    // If moving Down, find the highest target floor below us.
+    const internalTargets = passengers.map(p => p.person.targetFloor);
+
+    // Priority 2: Where is anyone waiting?
+    const externalTargets = floorQueues
+      .map((fq, idx) => (fq.upQueue.length > 0 || fq.downQueue.length > 0 ? idx : -1))
+      .filter(idx => idx !== -1);
+
+    const allTargets = [...new Set([...internalTargets, ...externalTargets])];
+
+    if (allTargets.length === 0) {
+      elevator.state = 'idle';
+      await wait(500); // Sit idle and wait for spawns
+      continue;
+    }
+
+    // Decide direction and next floor
+    // Continue in current direction if there are targets ahead
+    const targetsAhead = allTargets.filter(t =>
+      currentDir === 'up' ? t > currentFloor : t < currentFloor
+    );
+
+    if (targetsAhead.length > 0) {
+      // Pick the CLOSEST target in our current direction
+      targetFloor = currentDir === 'up'
+        ? Math.min(...targetsAhead)
+        : Math.max(...targetsAhead);
+    } else {
+      // No targets ahead? Switch direction and find closest target
+      currentDir = currentDir === 'up' ? 'down' : 'up';
+      const targetsNewDir = allTargets.filter(t =>
+        currentDir === 'up' ? t > currentFloor : t < currentFloor
+      );
+
+      if (targetsNewDir.length > 0) {
+        targetFloor = currentDir === 'up'
+          ? Math.min(...targetsNewDir)
+          : Math.max(...targetsNewDir);
+      } else if (allTargets.length > 0) {
+        // This handles the case where the only target is the current floor
+        // (e.g. someone just spawned here), we stay and wait for next loop
+        targetFloor = allTargets[0];
       }
+    }
 
-      await moveToFloor(nextFloor)
-
-      // 1. Drop off
-      dropPassengers()
-
-      // 2. Board
-      // On top floor must go down, on bottom must go up
-      const effectiveDir = elevator.currentFloor === config.floorsCount - 1 
-        ? 'down' 
-        : (elevator.currentFloor === 0 ? 'up' : (headingUp ? 'up' : 'down'))
-      
-      boardPassengers(floorQueues, effectiveDir)
-
-      await wait(1000)
-      elevator.state = 'idle'
+    // 3. Move directly to the target floor if it's not where we are
+    if (targetFloor !== -1 && targetFloor !== currentFloor) {
+      await moveToFloor(targetFloor);
+    } else {
+      await wait(500);
     }
   }
+}
 
-  void runDemoRoute()
+void runSmartElevator()
