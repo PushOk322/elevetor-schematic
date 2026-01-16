@@ -5,8 +5,8 @@ import { createPerson } from './person'
 import { createPersonView } from './personView'
 import {type FloorQueues, type PersonView} from './floorQueues'
 
-const MIN_SPAWN_INTERVAL = 8000 // 8 seconds
-const MAX_SPAWN_INTERVAL = 30000 // 30 seconds
+const MIN_SPAWN_INTERVAL = 8000
+const MAX_SPAWN_INTERVAL = 20000
 
 function randomSpawnDelay(): number {
   return MIN_SPAWN_INTERVAL + Math.random() * (MAX_SPAWN_INTERVAL - MIN_SPAWN_INTERVAL)

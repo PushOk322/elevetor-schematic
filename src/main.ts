@@ -28,8 +28,8 @@ const floorsGraphics = new PIXI.Graphics()
 for (let floor = 0; floor < config.floorsCount; floor += 1) {
   const y = floorToY(floor)
   // Use stroke to actually draw the lines
-  floorsGraphics.moveTo(config.shaftX - 100, y)
-  floorsGraphics.lineTo(config.rightX, y)
+  floorsGraphics.moveTo(config.shaftX + 50, y + 20)
+  floorsGraphics.lineTo(config.rightX, y + 20)
   floorsGraphics.stroke({ width: 1, color: 0xcccccc })
 }
 app.stage.addChild(floorsGraphics) // CRITICAL: Add to stage
@@ -75,23 +75,24 @@ const runSmartElevator = async () => {
   while (true) {
     const currentFloor = elevator.currentFloor;
 
-    // 1. Service the current floor (Drop off & Board)
+    // 1. Service the current floor
     const dropped = dropPassengers();
+    
+    // If elevator is empty, it can pick up anyone regardless of currentDir
+    if (passengers.length === 0) {
+      const fq = floorQueues[currentFloor];
+      if (fq.upQueue.length > 0) currentDir = 'up';
+      else if (fq.downQueue.length > 0) currentDir = 'down';
+    }
+    
     boardPassengers(floorQueues, currentDir);
 
     if (dropped.length > 0 || passengers.length > 0) {
-      await wait(1000); // "Doors open" delay
+      await wait(800); // Doors open
     }
 
-    // 2. Find the next target floor
-    let targetFloor = -1;
-
-    // Priority 1: If we have passengers, where do they want to go?
-    // If moving Up, find the lowest target floor above us.
-    // If moving Down, find the highest target floor below us.
+    // 2. Find targets
     const internalTargets = passengers.map(p => p.person.targetFloor);
-
-    // Priority 2: Where is anyone waiting?
     const externalTargets = floorQueues
       .map((fq, idx) => (fq.upQueue.length > 0 || fq.downQueue.length > 0 ? idx : -1))
       .filter(idx => idx !== -1);
@@ -100,44 +101,33 @@ const runSmartElevator = async () => {
 
     if (allTargets.length === 0) {
       elevator.state = 'idle';
-      await wait(500); // Sit idle and wait for spawns
+      await wait(200); 
       continue;
     }
 
-    // Decide direction and next floor
-    // Continue in current direction if there are targets ahead
-    const targetsAhead = allTargets.filter(t =>
+    // 3. Decide where to go next
+    let targetsAhead = allTargets.filter(t =>
       currentDir === 'up' ? t > currentFloor : t < currentFloor
     );
 
-    if (targetsAhead.length > 0) {
-      // Pick the CLOSEST target in our current direction
-      targetFloor = currentDir === 'up'
-        ? Math.min(...targetsAhead)
-        : Math.max(...targetsAhead);
-    } else {
-      // No targets ahead? Switch direction and find closest target
+    if (targetsAhead.length === 0) {
+      // No one ahead? Change direction
       currentDir = currentDir === 'up' ? 'down' : 'up';
-      const targetsNewDir = allTargets.filter(t =>
+      targetsAhead = allTargets.filter(t =>
         currentDir === 'up' ? t > currentFloor : t < currentFloor
       );
-
-      if (targetsNewDir.length > 0) {
-        targetFloor = currentDir === 'up'
-          ? Math.min(...targetsNewDir)
-          : Math.max(...targetsNewDir);
-      } else if (allTargets.length > 0) {
-        // This handles the case where the only target is the current floor
-        // (e.g. someone just spawned here), we stay and wait for next loop
-        targetFloor = allTargets[0];
-      }
     }
 
-    // 3. Move directly to the target floor if it's not where we are
-    if (targetFloor !== -1 && targetFloor !== currentFloor) {
-      await moveToFloor(targetFloor);
+    if (targetsAhead.length > 0) {
+      const nextTarget = currentDir === 'up' 
+        ? Math.min(...targetsAhead) 
+        : Math.max(...targetsAhead);
+      
+      await moveToFloor(nextTarget);
     } else {
-      await wait(500);
+      // Only targets are at current floor or behind (and we already swapped dir)
+      // If a target exists at current floor (someone just arrived), wait a bit
+      await wait(200);
     }
   }
 }

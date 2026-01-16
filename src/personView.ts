@@ -4,7 +4,7 @@ import { config } from './config'
 import type { Person } from './types'
 
 const PERSON_WIDTH = 30
-const PERSON_HEIGHT = 40
+const PERSON_HEIGHT = 20
 const WALK_DURATION = 1500 // ms to walk from rightX to waitX
 
 export function createPersonView(

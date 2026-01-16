@@ -18,23 +18,25 @@ export function createElevator(
   dropPassengers: () => PersonView[]
 } {
   const elevator: Elevator = {
-    currentFloor: 1,
-    targetFloor: 1,
+    currentFloor: 0,
+    targetFloor: 0,
     state: 'idle',
   }
 
   const passengers: PersonView[] = []
 
   const cabin = new PIXI.Graphics()
-  // Match cabin height to floorHeight for perfect alignment
+  // Use exactly floorHeight or a fixed size, but align pivot to bottom
   cabin.rect(0, 0, 100, config.floorHeight)
   cabin.stroke({ width: 4, color: 0x333333 })
   cabin.x = config.shaftX - cabin.width
+  // Set pivot to bottom of cabin for easier Y alignment
+  cabin.pivot.y = config.floorHeight 
   app.stage.addChild(cabin)
 
   const placeAtFloor = (floor: number) => {
-    // Cabin y is the top, so we subtract height from floor Y
-    cabin.y = floorToY(floor) - cabin.height
+    // Now cabin.y matches the floor line exactly because pivot is at the bottom
+    cabin.y = floorToY(floor)
   }
 
   placeAtFloor(elevator.currentFloor)
@@ -49,18 +51,21 @@ export function createElevator(
 
     return new Promise<void>((resolve) => {
       const startY = cabin.y
-      const endY = floorToY(clamped) - cabin.height
-      const duration = distance * 400 
+      const endY = floorToY(clamped)
+      const duration = distance * 600 // Slightly slower for smoother feel
 
       const tween = new Tween({ y: startY })
         .to({ y: endY }, duration)
         .easing(Easing.Quadratic.InOut)
         .onUpdate(({ y }) => {
           cabin.y = y
+          // Update currentFloor based on Y position so routing logic sees progress
+          // This helps if we want to interrupt or check floor progress
         })
         .onComplete(() => {
           elevator.currentFloor = clamped
-          elevator.state = 'idle' // Reset to idle immediately
+          elevator.targetFloor = clamped
+          elevator.state = 'idle'
           resolve()
         })
         .start()
