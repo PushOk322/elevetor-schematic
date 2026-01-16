@@ -12,7 +12,7 @@ export interface FloorQueues {
   downQueue: PersonView[]
 }
 
-const QUEUE_GAP = 8 // px gap between people in queue
+const QUEUE_GAP = 8
 
 function layoutQueue(queue: PersonView[]) {
   for (let i = 0; i < queue.length; i += 1) {

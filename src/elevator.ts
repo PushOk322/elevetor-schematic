@@ -26,7 +26,6 @@ export function createElevator(
   const passengers: PersonView[] = []
 
   const cabin = new PIXI.Graphics()
-  // Use exactly floorHeight or a fixed size, but align pivot to bottom
   cabin.rect(0, 0, 100, config.floorHeight)
   cabin.stroke({ width: 4, color: 0x333333 })
   cabin.x = config.shaftX - cabin.width
@@ -35,7 +34,6 @@ export function createElevator(
   app.stage.addChild(cabin)
 
   const placeAtFloor = (floor: number) => {
-    // Now cabin.y matches the floor line exactly because pivot is at the bottom
     cabin.y = floorToY(floor)
   }
 
@@ -52,15 +50,13 @@ export function createElevator(
     return new Promise<void>((resolve) => {
       const startY = cabin.y
       const endY = floorToY(clamped)
-      const duration = distance * 600 // Slightly slower for smoother feel
+      const duration = distance * 600
 
       const tween = new Tween({ y: startY })
         .to({ y: endY }, duration)
         .easing(Easing.Quadratic.InOut)
         .onUpdate(({ y }) => {
           cabin.y = y
-          // Update currentFloor based on Y position so routing logic sees progress
-          // This helps if we want to interrupt or check floor progress
         })
         .onComplete(() => {
           elevator.currentFloor = clamped
@@ -80,18 +76,15 @@ export function createElevator(
 
       const queue = direction === 'up' ? floorQueue.upQueue : floorQueue.downQueue
 
-      // Board passengers: same direction only, until capacity
       while (passengers.length < config.elevatorCapacity && queue.length > 0) {
         const personView = queue.shift()!
         passengers.push(personView)
         
         cabin.addChild(personView.view)
         
-        // Reset position relative to cabin
         personView.view.x = 0
         personView.view.y = 0
         
-        // Calculate a nice grid-like position inside the cabin border
         const index = passengers.length - 1;
         const row = Math.floor(index / 2);
         const col = index % 2;
@@ -110,7 +103,6 @@ export function createElevator(
         const pv = passengers[i]
         if (pv.person.targetFloor === elevator.currentFloor) {
           dropped.push(pv)
-          // Remove from cabin container
           cabin.removeChild(pv.view)
           pv.view.destroy()
           passengers.splice(i, 1)

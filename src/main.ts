@@ -18,21 +18,17 @@ const appElement = document.querySelector<HTMLDivElement>('#app')!
 appElement.innerHTML = ''
 appElement.appendChild(app.canvas)
 
-// Convert floor index (0 = ground) to Y coordinate
-// Fixed: removed (floor - 1) which caused misalignment
 const floorToY = (floor: number) =>
   app.renderer.height - config.bottomMargin - floor * config.floorHeight
 
-// Draw floor lines and labels
 const floorsGraphics = new PIXI.Graphics()
 for (let floor = 0; floor < config.floorsCount; floor += 1) {
   const y = floorToY(floor)
-  // Use stroke to actually draw the lines
   floorsGraphics.moveTo(config.shaftX + 50, y + 20)
   floorsGraphics.lineTo(config.rightX, y + 20)
   floorsGraphics.stroke({ width: 1, color: 0xcccccc })
 }
-app.stage.addChild(floorsGraphics) // CRITICAL: Add to stage
+app.stage.addChild(floorsGraphics)
 
 for (let floor = 0; floor < config.floorsCount; floor += 1) {
   const y = floorToY(floor)
@@ -45,28 +41,23 @@ for (let floor = 0; floor < config.floorsCount; floor += 1) {
   app.stage.addChild(label)
 }
 
-// Setup tween group
 const tweenGroup = new Group()
 app.ticker.add(() => {
   tweenGroup.update()
 })
 
-// Create floor queues
 const floorQueues = createFloorQueues()
 
-// Create elevator
 const { elevator, passengers, moveToFloor, boardPassengers, dropPassengers } = createElevator(
   app,
   tweenGroup,
   floorToY
 )
 
-// Start person spawner - add to queue when they reach waiting spot
 startPersonSpawner(app, tweenGroup, floorToY, (personView: PersonView) => {
   addPersonToQueue(floorQueues, personView.person.spawnFloor, personView)
-}, floorQueues) // Pass floorQueues
+}, floorQueues)
 
-// Demo elevator route
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const runSmartElevator = async () => {
@@ -93,8 +84,18 @@ const runSmartElevator = async () => {
 
     // 2. Find targets
     const internalTargets = passengers.map(p => p.person.targetFloor);
+    
+    // Filter external targets: only stop if someone wants to go our way, 
+    // OR if the elevator is empty (it can head to any floor with a queue).
     const externalTargets = floorQueues
-      .map((fq, idx) => (fq.upQueue.length > 0 || fq.downQueue.length > 0 ? idx : -1))
+      .map((fq, idx) => {
+        const hasAnyone = fq.upQueue.length > 0 || fq.downQueue.length > 0;
+        const hasSameDir = currentDir === 'up' ? fq.upQueue.length > 0 : fq.downQueue.length > 0;
+        
+        if (passengers.length === 0 && hasAnyone) return idx;
+        if (hasSameDir) return idx;
+        return -1;
+      })
       .filter(idx => idx !== -1);
 
     const allTargets = [...new Set([...internalTargets, ...externalTargets])];

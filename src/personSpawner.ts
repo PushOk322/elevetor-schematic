@@ -34,10 +34,7 @@ export function startPersonSpawner(
       const person = createPerson(floor)
       const view = createPersonView(app, tweenGroup, person, floorToY, () => {
         // When person reaches waiting spot, add to queue
-
-        console.log('[PERSON REACHED WAITING SPOT floor]', floor)
         onPersonReachWaitingSpot({ person, view })
-        // relayoutFloorQueues(queues, floor)
       })
       scheduleSpawn(floor) // Schedule next spawn for this floor
     }, delay)

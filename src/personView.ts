@@ -16,7 +16,6 @@ export function createPersonView(
 ): PIXI.Container {
   const container = new PIXI.Container()
 
-  // Person rectangle with color based on direction
   const color = person.dir === 'up' ? 0x0066ff : 0x00cc00 // blue for up, green for down
   const rect = new PIXI.Graphics()
   rect.rect(0, 0, PERSON_WIDTH, PERSON_HEIGHT)
