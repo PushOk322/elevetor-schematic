@@ -8,18 +8,19 @@ import { createFloorQueues, addPersonToQueue, type PersonView } from './floorQue
 
 const app = new PIXI.Application()
 
-await app.init({
-  width: config.canvasWidth,
-  height: config.canvasHeight,
-  backgroundColor: 0xffffff,
-})
+async function init() {
+  await app.init({
+    width: config.canvasWidth,
+    height: config.canvasHeight,
+    backgroundColor: 0xffffff,
+  })
 
-const appElement = document.querySelector<HTMLDivElement>('#app')!
-appElement.innerHTML = ''
-appElement.appendChild(app.canvas)
+  const appElement = document.querySelector<HTMLDivElement>('#app')!
+  appElement.innerHTML = ''
+  appElement.appendChild(app.canvas)
 
-const floorToY = (floor: number) =>
-  app.renderer.height - config.bottomMargin - floor * config.floorHeight
+  const floorToY = (floor: number) =>
+    app.renderer.height - config.bottomMargin - floor * config.floorHeight
 
 const floorsGraphics = new PIXI.Graphics()
 for (let floor = 0; floor < config.floorsCount; floor += 1) {
@@ -134,3 +135,8 @@ const runSmartElevator = async () => {
 }
 
 void runSmartElevator()
+}
+
+init().catch(err => {
+  console.error("Initialization failed", err);
+});

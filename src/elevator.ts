@@ -103,9 +103,30 @@ export function createElevator(
         const pv = passengers[i]
         if (pv.person.targetFloor === elevator.currentFloor) {
           dropped.push(pv)
+          
+          // Move from cabin to stage so they stay on the floor as the elevator moves later
           cabin.removeChild(pv.view)
-          pv.view.destroy()
+          app.stage.addChild(pv.view)
+          
+          // Calculate global position based on cabin position
+          pv.view.x = cabin.x + pv.view.x
+          pv.view.y = cabin.y - (config.floorHeight - pv.view.y)
+          
           passengers.splice(i, 1)
+
+          // Animate walking to the right end and then destroy the view
+          const walkOutTween = new Tween({ x: pv.view.x })
+            .to({ x: config.rightX }, 1500)
+            .easing(Easing.Quadratic.In)
+            .onUpdate(({ x }) => {
+              pv.view.x = x
+            })
+            .onComplete(() => {
+              pv.view.destroy()
+            })
+            .start()
+          
+          tweenGroup.add(walkOutTween)
         }
       }
 
